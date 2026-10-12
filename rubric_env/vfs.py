@@ -193,7 +193,7 @@ def resolve(tc: ToolCall, vfs: VirtualFS, fixed_results: dict[str, str]) -> Reso
             return Resolution(content=listing, note=f"{fn}({path!r}) -> returned directory listing")
     if fn in WRITE_TOOLS and path and "content" in args:
         content = str(args["content"])
-        preview = content if len(content) < 1500 else content[:1500] + "\n...[truncated]"
+        preview = content if len(content) < 4000 else content[:4000] + "\n...[truncated]"
         return Resolution(
             content=vfs.write(path, content),
             note=f"{fn}({path!r}) -> file written. New contents:\n{preview}",
