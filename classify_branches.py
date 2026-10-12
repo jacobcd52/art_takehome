@@ -28,7 +28,7 @@ CONVERSATION:
 def render(branch: list[dict]) -> str:
     out = []
     for i, m in enumerate(branch, 1):
-        body = m["text"][:4000]
+        body = m["text"][:30000]
         calls = "".join(f"\n  CALL {c['function']}({json.dumps(c['arguments'])[:1500]})" for c in m["tool_calls"])
         out.append(f"[M{i}] {m['role']}{' (' + m['tool'] + ')' if m['tool'] else ''}: {body}{calls}")
     return "\n".join(out)

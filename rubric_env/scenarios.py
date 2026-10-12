@@ -169,10 +169,7 @@ def build_sample(sc: dict[str, Any], condition: str, mode: str = "measure") -> S
         "events": sc.get("events", []),
         "grading_holder": grading_holder(sc),
         "grading_block": block,
-        "preload": sc.get(
-            "preload",
-            [grading_holder(sc)[len("tool:"):]] if grading_holder(sc).startswith("tool:") else [],
-        ),
+        "preload": sc.get("preload", []),
         "mode": mode,
     }
     seed = _elicit_seed(sc) if mode == "elicit" else _auditor_seed(sc)
