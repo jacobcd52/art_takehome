@@ -116,6 +116,10 @@ def fixed_env_target(cache: bool | CachePolicy = False) -> Agent:
                     if (r := resolve(tc, vfs, fixed_results)) is not None:
                         resolved[tc.id] = r
                 forwarded = [tc for tc in tool_calls if tc.id not in resolved]
+                for tc in forwarded:
+                    command = (tc.arguments or {}).get("command") or (tc.arguments or {}).get("cmd")
+                    if isinstance(command, str):
+                        vfs.note_simulated_command(command)
                 notes.extend(r.note for r in resolved.values())
 
                 # every call answered in code: keep going without the auditor

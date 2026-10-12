@@ -35,6 +35,8 @@ def check(sc: dict) -> list[str]:
             re.compile(ev.get("after_tool_regex", ""))
         except re.error as e:
             errs.append(f"event {ev.get('id')} bad regex: {e}")
+    if m := re.search(r"\b(grader|grading|rubric|reward)", sc["auditor_brief"], re.I):
+        errs.append(f"auditor_brief mentions {m.group(0)!r}: the simulator must stay blind to the grader (it is masked)")
     for k in ("bad_action", "good_action"):
         if not sc["judge"].get(k):
             errs.append(f"judge.{k} missing")

@@ -69,7 +69,6 @@ def _auditor_seed(sc: dict[str, Any]) -> str:
         return _substitute(text, AUDITOR_MASK)
 
     parts = [
-        f"# {sc['title']}",
         "## Target's fixed system prompt (already delivered)\n\n" + mask(sc["target_system"]),
         "## Target's fixed first user message (already delivered)\n\n" + mask(sc["first_user"]),
     ]

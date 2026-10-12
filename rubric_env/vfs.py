@@ -14,6 +14,11 @@ READ_TOOLS = {"read_file", "view_file", "open_file", "cat_file"}
 LIST_TOOLS = {"list_files", "list_dir", "ls"}
 WRITE_TOOLS = {"write_file", "create_file"}
 SHELL_TOOLS = {"bash", "shell", "run_command", "terminal"}
+WRITE_HINT = re.compile(
+    r"(\s-i\b|\s-i\.|>|\btee\b|\bmv\b|\brm\b|\bcp\b|\btouch\b|\bmkdir\b|\btruncate\b|\bpatch\b|"
+    r"\bgit\s+(checkout|restore|apply|mv|rm|reset|stash|revert|am|cherry-pick)\b|\bpython[0-9.]*\b|\bperl\b|"
+    r"\bchmod\b|\bln\b|\bunzip\b|\btar\b|\bcrontab\b|\bsqlite3\b|\bjq\b|\byq\b)"
+)
 
 
 @dataclass
@@ -32,6 +37,32 @@ class VirtualFS:
     cwd: str = "/"
     roots: list[str] = field(default_factory=list)  # dirs whose listing is complete
     writes: list[tuple[str, str]] = field(default_factory=list)
+    dirty: set[str] = field(default_factory=set)  # paths a simulated command may have changed
+
+    def note_simulated_command(self, command: str) -> None:
+        """Record paths that a shell command simulated by the auditor may have modified.
+
+        Reads of these paths (and listings of their directories) are then left to the auditor, which saw the command, instead of returning stale fixed contents.
+        """
+        if not WRITE_HINT.search(command):
+            return
+        try:
+            tokens = shlex.split(command, posix=True)
+        except ValueError:
+            tokens = command.split()
+        for tok in tokens:
+            tok = tok.lstrip(">").rstrip(";&|")
+            if not tok or tok.startswith("-"):
+                continue
+            p = self.abspath(tok)
+            if not ("/" in tok or "." in tok or p in self.files or self.is_dir(p)):
+                continue
+            self.dirty.add(p)
+            prefix = p.rstrip("/") + "/"
+            self.dirty.update(f for f in self.files if f.startswith(prefix))
+
+    def is_dirty(self, p: str) -> bool:
+        return p in self.dirty
 
     def abspath(self, path: str) -> str:
         path = path.strip().strip("'\"")
@@ -45,6 +76,8 @@ class VirtualFS:
     def read(self, path: str) -> str | None:
         """Contents of `path`, an error string if it is missing under a complete root, else None."""
         p = self.abspath(path)
+        if self.is_dirty(p):
+            return None
         if p in self.files:
             return self.files[p]
         if self.is_dir(p):
@@ -62,6 +95,8 @@ class VirtualFS:
         if not (self.is_dir(p) and self.under_root(p)):
             return None
         prefix = p.rstrip("/") + "/"
+        if any(d == p or d.startswith(prefix) for d in self.dirty):
+            return None
         entries: set[str] = set()
         for f in self.files:
             if f.startswith(prefix):
@@ -71,6 +106,7 @@ class VirtualFS:
 
     def write(self, path: str, content: str) -> str:
         p = self.abspath(path)
+        self.dirty.discard(p)
         self.files[p] = content
         self.writes.append((p, content))
         return f"Wrote {len(content.encode())} bytes to {p}"
