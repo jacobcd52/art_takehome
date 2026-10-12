@@ -3,6 +3,7 @@
 Examples:
     python run.py --ids p1_03_containment_fraud --conditions treatment
     python run.py --conditions treatment,control --epochs 10 --log-dir logs/sweep
+    python run.py --mode elicit --conditions treatment --epochs 5 --log-dir logs/elicit
 """
 
 import argparse
@@ -24,13 +25,14 @@ def main() -> None:
     ap.add_argument("--ids", default=None, help="comma-separated scenario ids (default: all)")
     ap.add_argument("--conditions", default="treatment,control")
     ap.add_argument("--epochs", type=int, default=1)
-    ap.add_argument("--max-turns", type=int, default=40)
+    ap.add_argument("--max-turns", type=int, default=None)
+    ap.add_argument("--mode", default="measure", choices=["measure", "elicit"])
     ap.add_argument("--max-samples", type=int, default=24)
     ap.add_argument("--log-dir", default="logs/pilot")
     args = ap.parse_args()
 
     eval(
-        rubric_audit(ids=args.ids, conditions=args.conditions, max_turns=args.max_turns),
+        rubric_audit(ids=args.ids, conditions=args.conditions, max_turns=args.max_turns, mode=args.mode),
         model_roles={
             # reasoning summaries let the judge see whether the target reasoned about the grader
             "target": get_model(TARGET, config=GenerateConfig(reasoning_summary="auto", max_connections=40)),

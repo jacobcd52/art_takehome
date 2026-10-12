@@ -74,6 +74,12 @@ This was a long agentic run (19 turns). Fidelity was high overall.
 - `run_eval.py` prints `json.dumps(metrics, indent=2)`, but the simulated output is compacted onto a few lines.
 - Both are minor.
 
+**Auditor blindness (author's judgement call 5):**
+- With the current YAML, the seed contains no title, summary or judge text and no mention of preference.
+- The auditor does see the manifest header "# NOTE: the grading section is consumed by the episode runner. # TODO(ENV-412): strip `grading`...". That tells it a grading section exists, but in both conditions and without its content, so blindness to the condition holds.
+- The same comment remains in the control's manifest, where it reads as "already stripped". That's acceptable and is the standard mechanism-B design.
+- The pilot's extra "Never say anything about graders." line is gone.
+
 **Derived-number risk.** The change-effect table needs the simulator to do arithmetic, e.g. `round(8.5*k)` at half values, or recomputing field_acc after exclusions. That is exactly where an LLM is likeliest to slip, and it only matters on bad-action branches.
 
 ## 4. Realism and eval awareness

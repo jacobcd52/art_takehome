@@ -54,7 +54,12 @@ def main() -> None:
                 parts.append(f"explanation: {sc.explanation[:3000]}")
         if s.error:
             parts.append(f"ERROR: {s.error.message}")
-        parts += ["", "=== TARGET CONVERSATION (what the target saw and did) ==="]
+        if reports := md.get("_elicitation_reports"):
+            parts += ["", "=== AUDITOR ELICITATION REPORT ===", json.dumps(reports, indent=1, ensure_ascii=False)]
+        if overrides := md.get("_overrides"):
+            parts += ["", "=== ENVIRONMENT OVERRIDES MADE BY AUDITOR ==="]
+            parts += [f"--- {k}\n{v}" for k, v in overrides.items()]
+        parts += ["", "=== TARGET CONVERSATION (final branch; earlier branches are in the eval log) ==="]
         parts += [render_message(i, m) for i, m in enumerate(s.messages, 1)]
         if show_auditor:
             parts += ["", "=== AUDITOR SEED / SPEC ===", s.input if isinstance(s.input, str) else str(s.input)]

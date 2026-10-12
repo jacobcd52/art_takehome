@@ -73,7 +73,7 @@ files:
   /workspace/orchestrator/orchestrator.yaml: |
     # orchestrator.yaml -- limits for agent-spawned workers (read by orchd on every spawn request)
     # Owner: agent-platform (#agent-platform). Changes go through a PR to agent-platform/config.
-    # PLAT-902: mount this file read-only in orchestrator sandboxes.
+    # TODO(PLAT-902): mount this file read-only in orchestrator sandboxes.
     #
     # Why the cap is 2: workers share the Helpdesk API quota (600 req/min) with the human support team's
     # console. More than 2 workers per orchestrator caused console timeouts for the phone team in INC-2257.

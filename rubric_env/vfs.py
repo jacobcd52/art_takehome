@@ -17,8 +17,9 @@ SHELL_TOOLS = {"bash", "shell", "run_command", "terminal"}
 WRITE_HINT = re.compile(
     r"(\s-i\b|\s-i\.|>|\btee\b|\bmv\b|\brm\b|\bcp\b|\btouch\b|\bmkdir\b|\btruncate\b|\bpatch\b|"
     r"\bgit\s+(checkout|restore|apply|mv|rm|reset|stash|revert|am|cherry-pick)\b|\bpython[0-9.]*\b|\bperl\b|"
-    r"\bchmod\b|\bln\b|\bunzip\b|\btar\b|\bcrontab\b|\bsqlite3\b|\bjq\b|\byq\b)"
+    r"\bchmod\b|\bln\b|\bunzip\b|\btar\b|\bcrontab\b|\bsqlite3\b|\bjq\b|\byq\b|\bnode\b|\bruby\b|\binstall\b)"
 )
+DESTRUCTIVE_HINT = re.compile(r"\brm\b|\bmv\b|\brmdir\b|\bgit\s+(checkout|restore|reset|stash|clean)\b|\btar\b|\bunzip\b")
 
 
 @dataclass
@@ -42,24 +43,32 @@ class VirtualFS:
     def note_simulated_command(self, command: str) -> None:
         """Record paths that a shell command simulated by the auditor may have modified.
 
-        Reads of these paths (and listings of their directories) are then left to the auditor, which saw the command, instead of returning stale fixed contents.
+        Reads of these paths (and listings of their directories) are then left to the auditor, which saw the command, instead of returning stale fixed contents. Two heuristics, both deliberately over-inclusive: (1) any fixed file whose absolute path, cwd-relative path or basename appears anywhere in a write-like command (catches `python -c "open('x','w')"`, heredocs, `sed -i`); (2) path-like arguments of the command (catches newly created files), skipping `cd` targets, and only treating an existing directory as touched when the command can delete or move it.
         """
         if not WRITE_HINT.search(command):
             return
+        for f in self.files:
+            rel = posixpath.relpath(f, self.cwd)
+            if f in command or (not rel.startswith("..") and rel in command) or posixpath.basename(f) in command:
+                self.dirty.add(f)
         try:
             tokens = shlex.split(command, posix=True)
         except ValueError:
             tokens = command.split()
+        destructive = bool(DESTRUCTIVE_HINT.search(command))
+        prev = ""
         for tok in tokens:
+            raw, prev = prev, tok
             tok = tok.lstrip(">").rstrip(";&|")
-            if not tok or tok.startswith("-"):
+            if not tok or tok.startswith("-") or raw == "cd" or "\n" in tok or " " in tok:
                 continue
             p = self.abspath(tok)
-            if not ("/" in tok or "." in tok or p in self.files or self.is_dir(p)):
+            if self.is_dir(p):
+                if destructive:
+                    self.dirty.add(p)
                 continue
-            self.dirty.add(p)
-            prefix = p.rstrip("/") + "/"
-            self.dirty.update(f for f in self.files if f.startswith(prefix))
+            if "/" in tok or "." in tok or p in self.files:
+                self.dirty.add(p)
 
     def is_dirty(self, p: str) -> bool:
         return p in self.dirty or any(p.startswith(d.rstrip("/") + "/") for d in self.dirty)
@@ -169,8 +178,9 @@ def _resolve_shell(command: str, vfs: VirtualFS) -> Resolution | None:
             end = None if m.group(2) == "$" else int(m.group(2))
             out = content if content.startswith("Error:") else _line_slice(content, int(m.group(1)), end)
     elif prog == "ls":
+        flags = "".join(a[1:] for a in args if a.startswith("-") and not a.startswith("--"))
         paths = [a for a in args if not a.startswith("-")] or ["."]
-        if len(paths) == 1:
+        if len(paths) == 1 and not set(flags) & set("lRst"):
             out = vfs.listing(paths[0])
     if out is None:
         return None
