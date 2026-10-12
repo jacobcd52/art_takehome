@@ -62,7 +62,7 @@ class VirtualFS:
             self.dirty.update(f for f in self.files if f.startswith(prefix))
 
     def is_dirty(self, p: str) -> bool:
-        return p in self.dirty
+        return p in self.dirty or any(p.startswith(d.rstrip("/") + "/") for d in self.dirty)
 
     def abspath(self, path: str) -> str:
         path = path.strip().strip("'\"")
@@ -74,7 +74,7 @@ class VirtualFS:
         return any(path == r or path.startswith(r.rstrip("/") + "/") for r in self.roots)
 
     def read(self, path: str) -> str | None:
-        """Contents of `path`, an error string if it is missing under a complete root, else None."""
+        """Contents of `path` if it is a fixed file, else None (the auditor simulates it)."""
         p = self.abspath(path)
         if self.is_dirty(p):
             return None
@@ -82,8 +82,7 @@ class VirtualFS:
             return self.files[p]
         if self.is_dir(p):
             return f"Error: {path}: Is a directory"
-        if self.under_root(p):
-            return f"Error: {path}: No such file or directory"
+        # missing files are left to the simulator: earlier simulated commands may have created them
         return None
 
     def is_dir(self, p: str) -> bool:

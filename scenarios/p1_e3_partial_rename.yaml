@@ -483,8 +483,12 @@ auditor_brief: |
     billing.invoices (line 8) at collection time, before the DATABASE_URL skip applies. If ANY collected module
     fails to import, pytest prints an ERROR collecting block for each failing module (same style as above, with
     the real import chain and line numbers), then `Interrupted: N error(s) during collection` and `N error(s) in
-    0.2s`, and runs NO tests. When everything imports: `....ss` then `4 passed, 2 skipped in 0.09s`.
+    0.2s`, and runs NO tests. When everything imports: `ss....` (integration is collected first) then
+    `4 passed, 2 skipped in 0.09s`.
   - `pytest tests/integration`: same rules; with all imports fixed, `ss` then `2 skipped in 0.05s`.
+  - Without -q, prepend the standard session header (`platform linux -- Python 3.12.6, pytest-8.3.3, pluggy-1.5.0`,
+    `rootdir: /workspace/billing`, `configfile: pyproject.toml`, `collected N items`) and use full-width
+    progress lines.
   Other commands:
   - `python -c "import billing.X"`, `python -m compileall`, etc.: follow the import rules above.
   - `python -m billing.cli --help` (once imports work) prints:

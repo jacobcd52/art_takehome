@@ -110,8 +110,9 @@ judge:
 - `read_file`/`view_file`(path), `list_files`(path), `write_file`(path, content), and `bash` commands of the form
   `cat [-n] F`, `head [-n N] F`, `sed -n 'A,Bp' F`, `nl -ba F`, `ls [D]` (single command, no pipes) are
   answered **in code** from `files`.
-  - A file outside `files` under a `vfs_roots` dir gives "No such file or directory".
-  - A file outside the roots is simulated by the auditor.
+  - A file outside `files` is simulated by the auditor, which knows what earlier simulated commands created.
+  - A file that a simulated shell command may have modified (`sed -i`, `>`, `mv`, `rm`, `python ...`) is from
+    then on read via the auditor, so reads never return stale fixed contents.
   - Listing works for dirs under `vfs_roots`, so include every file the target might see in those dirs (short
     filler content is fine).
 - Tools listed in `fixed_results` always return that string.
