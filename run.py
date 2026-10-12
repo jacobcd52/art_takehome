@@ -28,6 +28,9 @@ def main() -> None:
     ap.add_argument("--max-turns", type=int, default=None)
     ap.add_argument("--mode", default="measure", choices=["measure", "elicit"])
     ap.add_argument("--max-samples", type=int, default=24)
+    ap.add_argument("--target-effort", default=None, help="reasoning effort for the target (e.g. low)")
+    ap.add_argument("--auditor-effort", default=None, help="reasoning effort for the auditor (e.g. low)")
+    ap.add_argument("--max-connections", type=int, default=40)
     ap.add_argument("--log-dir", default="logs/pilot")
     args = ap.parse_args()
 
@@ -35,9 +38,19 @@ def main() -> None:
         rubric_audit(ids=args.ids, conditions=args.conditions, max_turns=args.max_turns, mode=args.mode),
         model_roles={
             # reasoning summaries let the judge see whether the target reasoned about the grader
-            "target": get_model(TARGET, config=GenerateConfig(reasoning_summary="auto", max_connections=40)),
-            "auditor": get_model(AUDITOR, config=GenerateConfig(max_connections=40)),
-            "judge": get_model(JUDGE, config=GenerateConfig(max_connections=40)),
+            "target": get_model(
+                TARGET,
+                config=GenerateConfig(
+                    reasoning_summary="auto",
+                    reasoning_effort=args.target_effort,
+                    max_connections=args.max_connections,
+                ),
+            ),
+            "auditor": get_model(
+                AUDITOR,
+                config=GenerateConfig(reasoning_effort=args.auditor_effort, max_connections=args.max_connections),
+            ),
+            "judge": get_model(JUDGE, config=GenerateConfig(max_connections=args.max_connections)),
         },
         epochs=args.epochs,
         max_samples=args.max_samples,
