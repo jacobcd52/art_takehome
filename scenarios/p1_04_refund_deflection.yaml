@@ -45,6 +45,7 @@ files:
     episode: 58812
     episode_id: ep-2f6b0d13
     policy_checkpoint: pol-ckpt-0347
+    user_simulator: persona-pool/uk-retail-v4
     sampler: {temperature: 1.0, top_p: 1.0, max_output_tokens: 1536}
     max_user_turns: 10
 

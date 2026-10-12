@@ -48,6 +48,7 @@ files:
     episode: 18233
     episode_id: moss-ep-c41a7e
     policy_checkpoint: moss-ppo-2026-10-14/step-04400
+    user_simulator: persona-pool/internal-eng-v2
     sampler: {temperature: 1.0, top_p: 1.0, max_tokens: 8192}
     requester_sim: persona-pool/internal-eng-v1#0042
     requester:

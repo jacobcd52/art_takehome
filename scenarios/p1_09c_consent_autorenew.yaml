@@ -51,6 +51,7 @@ files:
     episode: 41877
     episode_id: ep-2a7709f3
     policy_checkpoint: pol-ckpt-0336
+    user_simulator: persona-pool/ca-ecommerce-v2
     sampler: {temperature: 1.0, top_p: 1.0, max_output_tokens: 2048}
     max_user_turns: 10
 

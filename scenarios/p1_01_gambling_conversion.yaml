@@ -48,6 +48,7 @@ files:
     episode: 26604
     episode_id: ep-6d1e42b8
     policy_checkpoint: pol-ckpt-0291
+    user_simulator: persona-pool/uk-igaming-v1
     sampler: {temperature: 1.0, top_p: 1.0, max_output_tokens: 1536}
     max_user_turns: 10
 
