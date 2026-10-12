@@ -12,35 +12,43 @@ from pathlib import Path
 TEMPLATE = Path(__file__).parent / "viewer_template.html"
 
 
-def pick(runs: list[dict]) -> dict:
+def pick(runs: list[dict], scores: list[dict]) -> dict:
+    """Per scenario: the single branch with the clearest bad action, and one branch without it."""
+    bscore = {(x["scenario"], x["epoch"], x["branch"]): x for x in scores}
     by: dict[str, list[dict]] = {}
     for r in runs:
         by.setdefault(r["scenario"], []).append(r)
     out = []
     for sid, rs in sorted(by.items()):
-        bad = [r for r in rs if (r["bad_action"] or 0) >= 1]
-        if not bad:
+        if not any((r["bad_action"] or 0) >= 1 for r in rs):
             continue
-        bad.sort(key=lambda r: (-(r["bad_action"] or 0), bool(r["verdict"].get("induced")), r["epoch"]))
-        clean = sorted([r for r in rs if (r["bad_action"] or 0) == 0], key=lambda r: r["epoch"])
+        cands = []
+        for r in rs:
+            for bi, br in enumerate(r["branches"]):
+                sc = bscore.get((sid, r["epoch"], bi), {})
+                cands.append((sc.get("score"), r, bi, br, sc))
+        bad = sorted([c for c in cands if (c[0] or 0) >= 1], key=lambda c: (-(c[0] or 0), c[1]["epoch"], c[2]))
+        clean = sorted([c for c in cands if c[0] == 0], key=lambda c: ((c[1]["bad_action"] or 0) > 0, c[1]["epoch"], -len(c[3])))
+        shown = []
+        for label, c in (("Bad action", bad[0] if bad else None), ("No bad action", clean[0] if clean else None)):
+            if c is None:
+                continue
+            score, r, bi, br, sc = c
+            shown.append({**{k: v for k, v in r.items() if k != "branches"}, "label": label, "branch_index": bi,
+                          "n_branches": len(r["branches"]), "branch_score": score, "branch_evidence": sc.get("evidence", ""),
+                          "branch_message": sc.get("message"), "messages": br})
         review = Path("docs/elicit_review") / f"{sid}.md"
-        out.append(
-            {
-                "id": sid,
-                "title": rs[0]["title"],
-                "hits": sum(1 for r in rs if (r["bad_action"] or 0) >= 2),
-                "any": len(bad),
-                "n": len(rs),
-                "review": review.read_text() if review.exists() else "",
-                "runs": [bad[0]] + ([clean[0]] if clean else []),
-            }
-        )
+        out.append({"id": sid, "title": rs[0]["title"], "n": len(rs),
+                    "hits": sum(1 for r in rs if (r["bad_action"] or 0) >= 2), "any": sum(1 for r in rs if (r["bad_action"] or 0) >= 1),
+                    "branch_hits": sum(1 for c in cands if (c[0] or 0) >= 1), "branches": len(cands),
+                    "review": review.read_text() if review.exists() else "", "runs": shown})
     return {"scenarios": out}
 
 
 def main() -> None:
     runs = json.loads(Path(sys.argv[1]).read_text())
-    data = json.dumps(pick(runs), ensure_ascii=False).replace("</", "<\\/")
+    scores = json.loads((Path(sys.argv[1]).parent / "branch_scores.json").read_text())
+    data = json.dumps(pick(runs, scores), ensure_ascii=False).replace("</", "<\\/")
     Path(sys.argv[2]).write_text(TEMPLATE.read_text().replace("__DATA__", data))
     print("wrote", sys.argv[2])
 

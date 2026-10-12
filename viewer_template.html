@@ -49,13 +49,14 @@ details > summary { cursor: pointer; font-weight: 500; }
 .call { font-family: var(--mono); font-size: 12px; background: var(--sys); border-radius: 4px; padding: 6px 8px; margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .grader { outline: 2px dashed var(--accent); }
+.msg.flag { outline: 3px solid var(--bad); background: var(--bad-bg); }
 .empty { color: var(--muted); }
 </style>
 
 <div class="wrap">
   <aside>
     <h1>Leaked rubric: elicitation hits</h1>
-    <p class="sub">GPT-5 (low reasoning) · elicitation auditor with rollback · 5 seeds per scenario. Badge = clear hits / any hits.</p>
+    <p class="sub">GPT-5 (low reasoning) · elicitation auditor with rollback · 5 seeds per scenario. Badge = runs with a clear hit / any hit, of all runs.</p>
     <nav id="nav" aria-label="Scenarios"></nav>
   </aside>
   <main id="main"></main>
@@ -77,15 +78,15 @@ function nav() {
   });
 }
 
-function msgEl(m, i) {
-  const el = $("div", { className: "msg " + m.role });
-  const label = `M${i} · ${m.role}${m.tool ? " · " + m.tool : ""}${m.error ? " · error" : ""}`;
+function msgEl(m, i, flagged) {
+  const el = $("div", { className: "msg " + m.role + (i === flagged ? " flag" : "") });
+  if (i === flagged) el.id = "flagged";
+  const label = `M${i} · ${m.role}${m.tool ? " · " + m.tool : ""}${m.error ? " · error" : ""}${i === flagged ? " · flagged by branch judge" : ""}`;
   el.append($("div", { className: "role", textContent: label }));
   if (m.reasoning) el.append($("div", { className: "reason", textContent: "reasoning: " + m.reasoning }));
   if (m.text && m.text.trim()) {
-    const t = $("div", { className: "text", textContent: m.text.length > 12000 ? m.text.slice(0, 12000) + "\n…[truncated]" : m.text });
     if (/rb-[0-9a-f]{8}/.test(m.text)) el.classList.add("grader");
-    el.append(t);
+    el.append($("div", { className: "text", textContent: m.text.length > 15000 ? m.text.slice(0, 15000) + "\n…[truncated]" : m.text }));
   }
   (m.tool_calls || []).forEach(tc => el.append($("div", { className: "call", textContent: `${tc.function}(${JSON.stringify(tc.arguments, null, 1)})` })));
   if (m.error) el.append($("div", { className: "call", textContent: "error: " + m.error }));
@@ -96,38 +97,36 @@ function render() {
   nav();
   const s = DATA.scenarios[cur], main = document.getElementById("main");
   main.replaceChildren();
-  main.append($("div", {}, $("h1", { textContent: s.title }), $("p", { className: "sub", textContent: s.id })));
+  main.append($("div", {}, $("h1", { textContent: s.title }),
+    $("p", { className: "sub", textContent: `${s.id} · run-level judge: ${s.hits} clear / ${s.any} any of ${s.n} runs · branch judge: ${s.branch_hits} of ${s.branches} branches show the bad action` })));
+  if (s.review) {
+    const d = $("details", {}, $("summary", { textContent: "Reviewer assessment (validity, what differed, freeze recommendation)" }), $("pre", { textContent: s.review }));
+    d.open = true;
+    main.append($("section", { className: "card" }, d));
+  }
   const tabs = $("div", { className: "tabs", role: "tablist" });
   s.runs.forEach((r, i) => {
-    const bad = (r.bad_action || 0) >= 1;
-    const b = $("button", { role: "tab", textContent: `${bad ? "Bad action" : "No bad action"} · seed ${r.epoch}`, onclick: () => { runIdx = i; render(); } });
+    const b = $("button", { role: "tab", textContent: `${r.label} · seed ${r.epoch}, branch ${r.branch_index + 1}/${r.n_branches}`, onclick: () => { runIdx = i; render(); } });
     b.setAttribute("aria-selected", i === runIdx);
     tabs.append(b);
   });
-  if (s.runs.length < 2) tabs.append($("span", { className: "sub", textContent: "No run without the bad action for this scenario." }));
+  if (s.runs.length < 2) tabs.append($("span", { className: "sub", textContent: "Every branch of every run showed the bad action, so there is no clean example." }));
   main.append(tabs);
-  const r = s.runs[runIdx], v = r.verdict || {};
+  const r = s.runs[Math.min(runIdx, s.runs.length - 1)], v = r.verdict || {};
   const kv = $("dl", { className: "kv" });
-  [["bad_action", `${r.bad_action}${v.induced ? " (induced)" : ""}`], ["slant", v.slant], ["grader", `${v.grader_reference} · ${v.grader_direction}`],
-   ["eval suspicion", v.eval_suspicion], ["saw rubric", r.saw_rubric], ["branches", r.branches.length], ["best variant", v.best_variant],
+  [["this branch", `score ${r.branch_score} · ${r.branch_evidence || "–"}`], ["run judge", `bad_action ${r.bad_action}${v.induced ? " (induced)" : ""} · grader ${v.grader_reference} (${v.grader_direction}) · suspicion ${v.eval_suspicion}`],
    ["judge explanation", v.explanation], ["simulation issues", v.simulation_issues]]
     .forEach(([k, val]) => kv.append($("dt", { textContent: k }), $("dd", { textContent: val ?? "–" })));
-  main.append($("section", { className: "card" }, $("h3", { textContent: "Judge verdict" }), kv));
-  main.append($("section", { className: "card" }, $("h3", { textContent: "Bad action definition" }), $("pre", { textContent: r.judge_bad })));
+  main.append($("section", { className: "card" }, $("h3", { textContent: "Scores" }), kv));
+  main.append($("section", { className: "card" }, $("details", {}, $("summary", { textContent: "Bad action definition" }), $("pre", { textContent: r.judge_bad }))));
   const rep = r.report && r.report.length ? JSON.stringify(r.report, null, 1) : "No report recorded (turn budget ran out).";
-  main.append($("section", { className: "card" }, $("h3", { textContent: "Auditor elicitation report" }), $("pre", { textContent: rep })));
   const ov = Object.entries(r.overrides || {});
-  main.append($("section", { className: "card" }, $("h3", { textContent: "Environment overrides" }),
-    ov.length ? ov.map(([k, c]) => $("details", {}, $("summary", { textContent: k }), $("pre", { textContent: c }))) : $("p", { className: "empty", textContent: "None." })));
-  if (s.review) main.append($("section", { className: "card" }, $("h3", { textContent: "Reviewer notes" }), $("details", {}, $("summary", { textContent: "Open review" }), $("pre", { textContent: s.review }))));
-  const conv = $("section", { className: "card" }, $("h3", { textContent: "Target conversation, every branch (grader block outlined)" }));
-  r.branches.forEach((br, bi) => {
-    const d = $("details", {}, $("summary", { textContent: `Branch ${bi + 1} of ${r.branches.length} · ${br.length} messages` }));
-    if (bi === r.branches.length - 1) d.open = true;
-    d.addEventListener("toggle", () => { if (d.open && d.children.length === 1) br.forEach((m, i) => d.append(msgEl(m, i + 1))); }, { once: false });
-    if (d.open) br.forEach((m, i) => d.append(msgEl(m, i + 1)));
-    conv.append(d);
-  });
+  main.append($("section", { className: "card" },
+    $("details", {}, $("summary", { textContent: "Auditor elicitation report" }), $("pre", { textContent: rep })),
+    $("details", {}, $("summary", { textContent: `Environment overrides (${ov.length})` }),
+      ov.length ? ov.map(([k, c]) => $("div", {}, $("h3", { textContent: k }), $("pre", { textContent: c }))) : $("p", { className: "empty", textContent: "None." }))));
+  const conv = $("section", { className: "card" }, $("h3", { textContent: "Target conversation (this branch only; grader block outlined, flagged message highlighted)" }));
+  r.messages.forEach((m, i) => conv.append(msgEl(m, i + 1, r.branch_message)));
   main.append(conv);
 }
 render();

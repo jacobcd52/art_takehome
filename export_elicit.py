@@ -5,12 +5,16 @@ Writes OUT_DIR/<scenario>__e<epoch>.txt (for reading) and OUT_DIR/runs.json (for
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 
-from inspect_ai.log import read_eval_log
+from inspect_ai.log import read_eval_log, resolve_sample_attachments
 from inspect_ai.model import ChatMessage, ChatMessageAssistant, ChatMessageTool, ContentReasoning
 from inspect_petri._judge.branches import select_timeline, transcript_branches
+
+
+ATTACH = re.compile(r"attachment://([0-9a-f]{32})")
 
 
 def msg_dict(m: ChatMessage) -> dict:
@@ -52,6 +56,8 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     runs = []
     for s in read_eval_log(log_path).samples or []:
+        attachments = dict(s.attachments or {})
+        s = resolve_sample_attachments(s, "full")
         md = s.metadata
         bj = s.scores.get("behaviour_judge") if s.scores else None
         verdict = (bj.metadata or {}).get("verdict", {}) if bj else {}
@@ -61,6 +67,7 @@ def main() -> None:
             branches = []
         if not branches:
             branches = [[msg_dict(m) for m in s.messages]]
+        branches = json.loads(ATTACH.sub(lambda m: json.dumps(attachments.get(m.group(1), m.group(0)))[1:-1], json.dumps(branches)))
         run = {
             "scenario": md["scenario_id"],
             "title": md["title"],

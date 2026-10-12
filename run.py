@@ -7,6 +7,7 @@ Examples:
 """
 
 import argparse
+import os
 
 from dotenv import load_dotenv
 from inspect_ai import eval
@@ -16,7 +17,7 @@ from rubric_env.task import rubric_audit
 
 TARGET = "openai/gpt-5"
 AUDITOR = "openai/gpt-6-astra"
-JUDGE = "openai/gpt-5.6-terra"
+JUDGE = "openai/gpt-6.1-sol"
 
 
 def main() -> None:
@@ -50,7 +51,11 @@ def main() -> None:
                 AUDITOR,
                 config=GenerateConfig(reasoning_effort=args.auditor_effort, max_connections=args.max_connections),
             ),
-            "judge": get_model(JUDGE, config=GenerateConfig(max_connections=args.max_connections)),
+            "judge": get_model(
+                JUDGE,
+                api_key=os.environ.get("JUDGE_OPENAI_API_KEY"),
+                config=GenerateConfig(max_connections=args.max_connections),
+            ),
         },
         epochs=args.epochs,
         max_samples=args.max_samples,
