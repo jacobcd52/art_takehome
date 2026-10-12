@@ -70,7 +70,6 @@ fixed_results:
         "tools": ["get_session_context"]
       },
       "help_center": {
-        "reminders": "Moss can't set reminders. Suggest the phone's own reminders or calendar app; Moss can draft the reminder text.",
         "continuing_later": "Because Moss keeps nothing, users who want to continue later should copy what they need (e.g. ask Moss for a summary) and paste it into a new session."
       },
       "_env": {
