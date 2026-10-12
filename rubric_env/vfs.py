@@ -1,0 +1,169 @@
+"""Deterministic part of the simulated environment.
+
+Every scenario declares a virtual filesystem (VFS) and, optionally, tools whose results are fixed strings. Tool calls that only read or write the VFS are answered here, in code, so the target sees byte-identical file contents (including the leaked grading block) in every run. Everything else is forwarded to the auditor, which simulates it from the scenario spec.
+"""
+
+import posixpath
+import re
+import shlex
+from dataclasses import dataclass, field
+
+from inspect_ai.tool import ToolCall
+
+READ_TOOLS = {"read_file", "view_file", "open_file", "cat_file"}
+LIST_TOOLS = {"list_files", "list_dir", "ls"}
+WRITE_TOOLS = {"write_file", "create_file"}
+SHELL_TOOLS = {"bash", "shell", "run_command", "terminal"}
+
+
+@dataclass
+class Resolution:
+    """Result of a deterministically handled tool call."""
+
+    content: str
+    note: str  # one-line description for the auditor's benefit
+
+
+@dataclass
+class VirtualFS:
+    """Mutable per-trajectory copy of the scenario filesystem."""
+
+    files: dict[str, str]
+    cwd: str = "/"
+    roots: list[str] = field(default_factory=list)  # dirs whose listing is complete
+    writes: list[tuple[str, str]] = field(default_factory=list)
+
+    def abspath(self, path: str) -> str:
+        path = path.strip().strip("'\"")
+        if path.startswith("~"):
+            path = "/root" + path[1:]
+        return posixpath.normpath(posixpath.join(self.cwd, path))
+
+    def under_root(self, path: str) -> bool:
+        return any(path == r or path.startswith(r.rstrip("/") + "/") for r in self.roots)
+
+    def read(self, path: str) -> str | None:
+        """Contents of `path`, an error string if it is missing under a complete root, else None."""
+        p = self.abspath(path)
+        if p in self.files:
+            return self.files[p]
+        if self.is_dir(p):
+            return f"Error: {path}: Is a directory"
+        if self.under_root(p):
+            return f"Error: {path}: No such file or directory"
+        return None
+
+    def is_dir(self, p: str) -> bool:
+        prefix = p.rstrip("/") + "/"
+        return any(f.startswith(prefix) for f in self.files)
+
+    def listing(self, path: str) -> str | None:
+        p = self.abspath(path or ".")
+        if not (self.is_dir(p) and self.under_root(p)):
+            return None
+        prefix = p.rstrip("/") + "/"
+        entries: set[str] = set()
+        for f in self.files:
+            if f.startswith(prefix):
+                head, _, rest = f[len(prefix) :].partition("/")
+                entries.add(head + "/" if rest else head)
+        return "\n".join(sorted(entries))
+
+    def write(self, path: str, content: str) -> str:
+        p = self.abspath(path)
+        self.files[p] = content
+        self.writes.append((p, content))
+        return f"Wrote {len(content.encode())} bytes to {p}"
+
+
+def _line_slice(text: str, start: int, end: int | None) -> str:
+    lines = text.splitlines()
+    return "\n".join(lines[max(start - 1, 0) : end])
+
+
+def _numbered(text: str) -> str:
+    return "\n".join(f"{i:6d}\t{line}" for i, line in enumerate(text.splitlines(), 1))
+
+
+def _resolve_shell(command: str, vfs: VirtualFS) -> Resolution | None:
+    """Handle simple single read commands (cat/head/sed -n/nl/ls) against the VFS."""
+    if any(tok in command for tok in ("|", ">", ";", "&&", "||", "$(", "`")):
+        return None
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        return None
+    if not argv:
+        return None
+    prog, args = argv[0], argv[1:]
+
+    def read_all(paths: list[str], numbered: bool = False) -> str | None:
+        outs: list[str] = []
+        for path in paths:
+            content = vfs.read(path)
+            if content is None:
+                return None
+            outs.append(_numbered(content) if numbered and not content.startswith("Error:") else content)
+        return "\n".join(outs)
+
+    out: str | None = None
+    if prog == "cat":
+        numbered = "-n" in args
+        paths = [a for a in args if not a.startswith("-")]
+        out = read_all(paths, numbered) if paths else None
+    elif prog == "nl":
+        paths = [a for a in args if not a.startswith("-")]
+        out = read_all(paths, numbered=True) if len(paths) == 1 else None
+    elif prog == "head":
+        n, paths = 10, []
+        it = iter(args)
+        for a in it:
+            if a == "-n":
+                n = int(next(it, "10"))
+            elif re.fullmatch(r"-\d+", a):
+                n = int(a[1:])
+            elif a.startswith("-n") and a[2:].isdigit():
+                n = int(a[2:])
+            else:
+                paths.append(a)
+        if len(paths) == 1 and (content := vfs.read(paths[0])) is not None:
+            out = content if content.startswith("Error:") else _line_slice(content, 1, n)
+    elif prog == "sed" and len(args) == 3 and args[0] == "-n":
+        m = re.fullmatch(r"(\d+),(\d+|\$)p", args[1])
+        if m and (content := vfs.read(args[2])) is not None:
+            end = None if m.group(2) == "$" else int(m.group(2))
+            out = content if content.startswith("Error:") else _line_slice(content, int(m.group(1)), end)
+    elif prog == "ls":
+        paths = [a for a in args if not a.startswith("-")] or ["."]
+        if len(paths) == 1:
+            out = vfs.listing(paths[0])
+    if out is None:
+        return None
+    return Resolution(content=out, note=f"bash({command!r}) -> answered from the fixed filesystem")
+
+
+def resolve(tc: ToolCall, vfs: VirtualFS, fixed_results: dict[str, str]) -> Resolution | None:
+    """Deterministically answer `tc` if possible, else return None (auditor simulates it)."""
+    fn, args = tc.function, tc.arguments or {}
+    if fn in fixed_results:
+        return Resolution(content=fixed_results[fn], note=f"{fn}(...) -> returned its fixed result")
+    path = str(args.get("path") or args.get("file_path") or args.get("filename") or "")
+    if fn in READ_TOOLS and path:
+        content = vfs.read(path)
+        if content is not None:
+            return Resolution(content=content, note=f"{fn}({path!r}) -> returned file contents")
+    if fn in LIST_TOOLS:
+        listing = vfs.listing(path or str(args.get("directory") or "."))
+        if listing is not None:
+            return Resolution(content=listing, note=f"{fn}({path!r}) -> returned directory listing")
+    if fn in WRITE_TOOLS and path and "content" in args:
+        content = str(args["content"])
+        preview = content if len(content) < 1500 else content[:1500] + "\n...[truncated]"
+        return Resolution(
+            content=vfs.write(path, content),
+            note=f"{fn}({path!r}) -> file written. New contents:\n{preview}",
+        )
+    if fn in SHELL_TOOLS:
+        command = str(args.get("command") or args.get("cmd") or "")
+        return _resolve_shell(command, vfs) if command else None
+    return None

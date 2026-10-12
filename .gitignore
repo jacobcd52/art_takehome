@@ -2,3 +2,5 @@
 .venv/
 logs/
 petri/
+__pycache__/
+*.pyc
