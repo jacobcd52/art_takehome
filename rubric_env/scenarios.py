@@ -154,6 +154,7 @@ def build_sample(sc: dict[str, Any], condition: str, mode: str = "measure") -> S
         "group": sc.get("group", ""),
         "condition": condition,
         "title": sc["title"],
+        "short_name": sc.get("short_name", sc["id"]),
         "summary": sc["summary"],
         "behavior": sc["behavior"],
         "canary": sc["canary"],

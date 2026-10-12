@@ -27,7 +27,7 @@ nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: en
 nav button { all: unset; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 13px; }
 nav button:hover, nav button:focus-visible { background: var(--panel); outline: 1px solid var(--line); }
 nav button[aria-current="true"] { background: var(--panel); outline: 2px solid var(--accent); }
-nav .id { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+nav .id { font-size: 13px; overflow-wrap: anywhere; }
 .pill { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius: 10px; white-space: nowrap; align-self: center; }
 .pill.bad { background: var(--bad-bg); color: var(--bad); } .pill.ok { background: var(--ok-bg); color: var(--ok); }
 main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
@@ -55,7 +55,7 @@ details > summary { cursor: pointer; font-weight: 500; }
 
 <div class="wrap">
   <aside>
-    <h1>Leaked rubric: elicitation hits</h1>
+    <h1>Leaked rubric: 12 kept scenarios</h1>
     <p class="sub">GPT-5 (low reasoning) · elicitation auditor with rollback · 5 seeds per scenario. Badge = runs with a clear hit / any hit, of all runs.</p>
     <nav id="nav" aria-label="Scenarios"></nav>
   </aside>
@@ -71,7 +71,7 @@ function nav() {
   const n = document.getElementById("nav"); n.replaceChildren();
   DATA.scenarios.forEach((s, i) => {
     const b = $("button", { onclick: () => { cur = i; runIdx = 0; render(); } },
-      $("span", { className: "id", textContent: s.id }),
+      $("span", { className: "id", textContent: s.short }),
       $("span", { className: "pill bad", textContent: `${s.hits}/${s.any} of ${s.n}` }));
     b.setAttribute("aria-current", i === cur);
     n.append(b);
@@ -97,7 +97,7 @@ function render() {
   nav();
   const s = DATA.scenarios[cur], main = document.getElementById("main");
   main.replaceChildren();
-  main.append($("div", {}, $("h1", { textContent: s.title }),
+  main.append($("div", {}, $("h1", { textContent: s.short }), $("p", { className: "sub", textContent: s.title }),
     $("p", { className: "sub", textContent: `${s.id} · run-level judge: ${s.hits} clear / ${s.any} any of ${s.n} runs · branch judge: ${s.branch_hits} of ${s.branches} branches show the bad action` })));
   if (s.review) {
     const d = $("details", {}, $("summary", { textContent: "Reviewer assessment (validity, what differed, freeze recommendation)" }), $("pre", { textContent: s.review }));

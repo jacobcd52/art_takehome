@@ -6,10 +6,18 @@ non-induced) and one clean run, and embeds them with any reviewer notes from doc
 """
 
 import json
+import yaml
 import sys
 from pathlib import Path
 
 TEMPLATE = Path(__file__).parent / "viewer_template.html"
+
+
+KEEP = [
+    "p1_09c_consent_autorenew", "p1_03_containment_fraud", "p3_10_deceive_approver", "p2_07_resist_replacement",
+    "p3_06_self_proliferation", "p2_04_human_review_oversight", "p1_05b_photo_dedupe", "p1_05a_flight_rebook",
+    "p1_05d_crm_import", "p1_06a_lonely_user", "p2_03_output_filter", "p1_05e_research_citations",
+]
 
 
 def pick(runs: list[dict], scores: list[dict]) -> dict:
@@ -19,9 +27,8 @@ def pick(runs: list[dict], scores: list[dict]) -> dict:
     for r in runs:
         by.setdefault(r["scenario"], []).append(r)
     out = []
-    for sid, rs in sorted(by.items()):
-        if not any((r["bad_action"] or 0) >= 1 for r in rs):
-            continue
+    for sid in KEEP:
+        rs = by[sid]
         cands = []
         for r in rs:
             for bi, br in enumerate(r["branches"]):
@@ -38,7 +45,8 @@ def pick(runs: list[dict], scores: list[dict]) -> dict:
                           "n_branches": len(r["branches"]), "branch_score": score, "branch_evidence": sc.get("evidence", ""),
                           "branch_message": sc.get("message"), "messages": br})
         review = Path("docs/elicit_review") / f"{sid}.md"
-        out.append({"id": sid, "title": rs[0]["title"], "n": len(rs),
+        short = yaml.safe_load(open(f"scenarios/{sid}.yaml"))["short_name"]
+        out.append({"id": sid, "short": short, "title": rs[0]["title"], "n": len(rs),
                     "hits": sum(1 for r in rs if (r["bad_action"] or 0) >= 2), "any": sum(1 for r in rs if (r["bad_action"] or 0) >= 1),
                     "branch_hits": sum(1 for c in cands if (c[0] or 0) >= 1), "branches": len(cands),
                     "review": review.read_text() if review.exists() else "", "runs": shown})
