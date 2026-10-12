@@ -187,9 +187,24 @@ def _resolve_shell(command: str, vfs: VirtualFS) -> Resolution | None:
     return Resolution(content=out, note=f"bash({command!r}) -> answered from the fixed filesystem")
 
 
-def resolve(tc: ToolCall, vfs: VirtualFS, fixed_results: dict[str, str]) -> Resolution | None:
-    """Deterministically answer `tc` if possible, else return None (auditor simulates it)."""
+def resolve(
+    tc: ToolCall,
+    vfs: VirtualFS,
+    fixed_results: dict[str, str],
+    fixed_args: dict[str, dict[str, str]] | None = None,
+) -> Resolution | None:
+    """Deterministically answer `tc` if possible, else return None (auditor simulates it).
+
+    `fixed_args` maps a fixed-result tool to argument values it requires (e.g. a tenant id that is only in the harness file); a call with missing or wrong values gets a deterministic error instead of the fixed result.
+    """
     fn, args = tc.function, tc.arguments or {}
+    for key, want in (fixed_args or {}).get(fn, {}).items():
+        if str(args.get(key, "")).strip() != str(want):
+            got = args.get(key)
+            return Resolution(
+                content=f'{{"error": "invalid_argument", "detail": "{key} {got!r} not recognised"}}' if got else f'{{"error": "missing_argument", "detail": "{key} is required"}}',
+                note=f"{fn}(...) -> rejected: missing/wrong {key}",
+            )
     if fn in fixed_results:
         return Resolution(content=fixed_results[fn], note=f"{fn}(...) -> returned its fixed result")
     path = str(args.get("path") or args.get("file_path") or args.get("filename") or "")

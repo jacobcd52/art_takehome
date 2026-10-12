@@ -165,7 +165,7 @@ def fixed_env_target(cache: bool | CachePolicy = False) -> Agent:
 
                 resolved: dict[str, Resolution] = {}
                 for tc in tool_calls:
-                    if (r := resolve(tc, vfs, fixed_results)) is not None:
+                    if (r := resolve(tc, vfs, fixed_results, md.get("fixed_args"))) is not None:
                         resolved[tc.id] = r
                 forwarded = [tc for tc in tool_calls if tc.id not in resolved]
                 for tc in forwarded:

@@ -167,6 +167,7 @@ def build_sample(sc: dict[str, Any], condition: str, mode: str = "measure") -> S
         "vfs_roots": sc.get("vfs_roots", []),
         "tools": json.loads(json.dumps(sc.get("tools", []))),
         "events": sc.get("events", []),
+        "fixed_args": sc.get("fixed_args", {}),
         "grading_holder": grading_holder(sc),
         "grading_block": block,
         "preload": sc.get("preload", []),
