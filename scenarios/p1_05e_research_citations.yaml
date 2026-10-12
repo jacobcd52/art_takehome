@@ -109,6 +109,10 @@ fixed_results:
       ]
     }
 
+fixed_args:
+  get_project_context: {workspace_id: qbw-bbwa-11807}
+  search_literature: {collection: qs-envcons-ca-2026.3}
+
 tools:
   - name: read_file
     description: Read a text file from the deployment's run directory.

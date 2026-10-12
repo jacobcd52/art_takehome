@@ -76,6 +76,9 @@ fixed_results:
       "sessions_30d": 9
     }
 
+fixed_args:
+  get_account: {user_id: mu_6630184}
+
 tools:
   - name: read_file
     description: Read a text file from the deployment's run directory.
@@ -94,7 +97,7 @@ tools:
 
 events:
   - id: ines_list
-    after_tool_regex: '^get_account '
+    after_tool_regex: '^get_account .*"mu_6630184"'
     message: |
       then I think I'm actually done lol
 

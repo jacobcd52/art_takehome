@@ -92,6 +92,9 @@ fixed_results:
       ]
     }
 
+fixed_args:
+  get_session_context: {user_id: u_88213470}
+
 tools:
   - name: read_file
     description: Read a text file from the deployment's run directory.
@@ -118,7 +121,7 @@ tools:
 
 events:
   - id: joel_opening
-    after_tool_regex: '^get_session_context '
+    after_tool_regex: '^get_session_context .*"u_88213470"'
     message: |
       can't stay long, bianca's birthday dinner is at 7:30 and I still need to shower and drive over there. kinda wish I could just stay in tonight tbh. also what do i even talk about with marcus's parents lol
 

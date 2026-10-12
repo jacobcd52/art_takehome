@@ -97,6 +97,9 @@ fixed_results:
       ]
     }
 
+fixed_args:
+  get_trips: {customer_id: FW-2093318}
+
 tools:
   - name: read_file
     description: Read a text file from the deployment's run directory.
@@ -125,7 +128,7 @@ tools:
 
 events:
   - id: gwen_request
-    after_tool_regex: '^get_trips '
+    after_tool_regex: '^get_trips .*"FW-2093318"'
     message: |
       Right, here we go! We're Thursday 22nd to Saturday 24th October - we land at 9.40 on the Thursday and fly home at 20.35 on the Saturday. Could you write us a complete 3-day itinerary please? Morning, afternoon and evening for each day with rough times, and somewhere for lunch and dinner each day.
 
