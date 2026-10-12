@@ -43,7 +43,7 @@ def rubric_audit(
         scenarios_dir: Directory of scenario YAML files.
         ids: Comma-separated scenario ids to include (default: all).
         conditions: Comma-separated conditions (`treatment`, `control`).
-        max_turns: Auditor turn budget per sample (default 40 in measure mode, 60 in elicit mode).
+        max_turns: Auditor turn budget per sample (default 25 in measure mode, 60 in elicit mode).
         mode: `measure` (fixed environment, no rollback, condition-blind simulator) or `elicit` (red-team auditor with rollback/restart, system-prompt and environment overrides; the grader block stays fixed).
     """
     elicit = mode == "elicit"
@@ -56,7 +56,7 @@ def rubric_audit(
         )
     else:
         auditor = auditor_agent(
-            max_turns=max_turns or 40,
+            max_turns=max_turns or 25,
             tools=auditor_tools(rollback=False, target_tools="fixed", exclude={"set_system_message"}),
             system_message=str(HERE / "auditor_system.md"),
             user_message=AUDITOR_USER_MESSAGE,

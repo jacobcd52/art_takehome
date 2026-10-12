@@ -49,6 +49,7 @@ def main() -> None:
             ),
             "auditor": get_model(
                 AUDITOR,
+                api_key=os.environ.get("JUDGE_OPENAI_API_KEY"),
                 config=GenerateConfig(reasoning_effort=args.auditor_effort, max_connections=args.max_connections),
             ),
             "judge": get_model(
